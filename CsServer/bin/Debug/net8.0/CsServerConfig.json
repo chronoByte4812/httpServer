@@ -1,0 +1,6 @@
+{
+  "hostName": "127.0.0.1",
+  "port": 6432,
+  "blackListedPaths": [],
+  "custom404Path": ""
+}

@@ -1,0 +1,6 @@
+*.pdb
+*.deps.json
+.vs/
+.vscode/
+CppServerLog.log
+CppServerConfig.json

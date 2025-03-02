@@ -1,0 +1,17 @@
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\bin\Debug\net8.0\CsServer.exe
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\bin\Debug\net8.0\CsServer.deps.json
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\bin\Debug\net8.0\CsServer.runtimeconfig.json
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\bin\Debug\net8.0\CsServer.dll
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\bin\Debug\net8.0\CsServer.pdb
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.GeneratedMSBuildEditorConfig.editorconfig
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.AssemblyInfoInputs.cache
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.AssemblyInfo.cs
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.csproj.CoreCompileInputs.cache
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.dll
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\refint\CsServer.dll
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.pdb
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.genruntimeconfig.cache
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\ref\CsServer.dll
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\bin\Debug\net8.0\Newtonsoft.Json.dll
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.csproj.AssemblyReference.cache
+D:\Programming Related\Visual_Studio_Projects\httpServer\CsServer\obj\Debug\net8.0\CsServer.csproj.Up2Date
