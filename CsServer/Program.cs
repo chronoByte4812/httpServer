@@ -65,7 +65,7 @@ class Program
                 Log("Config found!");
 
                 string data = File.ReadAllText(configFile);
-                dynamic ?config = JsonConvert.DeserializeObject(data);
+                dynamic? config = JsonConvert.DeserializeObject(data);
 
                 string newIp = config.hostName;
                 string newPort = config.port.ToString();
