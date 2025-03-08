@@ -136,7 +136,7 @@ int main(char *argv[], int argc)
 	svr.Get("/", [&](const httplib::Request &req, httplib::Response &res) // Root path (./index.html).
 			{
 			std::string client_ip = req.remote_addr;
-			std::string filePath = (fs::current_path() / "index.html").string();
+			std::string filePath = (fs::absolute(fs::current_path() / "index.html").string());
 
 			if (fs::exists(filePath)) {
 				res.set_content(readFile(filePath), "text/html");
@@ -171,10 +171,20 @@ int main(char *argv[], int argc)
 		else
 		{
 			res.status = httplib::StatusCode::NotFound_404;
-			log("Client " + client_ip + " requested (404 Not Found)\n");
+			log("Client " + client_ip + " requested " + req.path + " (404 Not Found)\n");
 			res.set_content(custom404Page, "text/html");
 		};
 	});
+
+	svr.Post("/submit", [](const httplib::Request& req, httplib::Response& res) {
+		std::string name0 = req.get_param_value("name");
+		std::string email0 = req.get_param_value("email");
+
+		std::cout << "Name: " + name0 + " Email: " + email0 + "\n";
+
+		res.set_content("Got the info!", "text/plain");
+		res.set_redirect("/");
+		});
 
 	try
 	{
