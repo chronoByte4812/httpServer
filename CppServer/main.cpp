@@ -10,7 +10,7 @@ httplib::Server svr;
 std::string custom404Page = "<h3 style='color: red;'>404 - Not found: That file not found on this server.</h1>";
 std::string configFile = (fs::current_path() / "CppServerConfig.json").string();
 std::vector<std::string> blackListedPaths;
-std::string ip = "0.0.0.0";
+std::string ip = "127.0.0.1";
 int port = 6432;
 
 static std::string getMimeType(const std::string &extension)

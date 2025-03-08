@@ -1,2 +1,5 @@
-[2025-02-22 20:31:15] - A configuration file was not found, the program will create one with default settings.
-[2025-02-22 20:31:15] - An error occurred while running the server: The parameter is incorrect.
+[08-03-25 14:42:30] - A configuration file was not found, The program will write one with the default settings.
+[08-03-25 14:42:30] - Server listening on 127.0.0.1:6432
+[08-03-25 14:42:41] - Config found!
+[08-03-25 14:42:41] - Server listening on 127.0.0.1:6432
+[08-03-25 14:42:49] - Client 127.0.0.1:63666 requested / (404 Not Found)

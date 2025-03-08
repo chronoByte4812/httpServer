@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "CppServer\\CppServer.vcxproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "CsServer\\CsServer.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
