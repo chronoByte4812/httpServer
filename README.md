@@ -1,4 +1,4 @@
-# Http web servers.
+# Http web server.
 
 ## Used libraries.
 
