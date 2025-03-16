@@ -27,6 +27,7 @@ std::unordered_map<std::string, std::string> mime_types = {
 	{".jpeg", "image/jpeg"},
 	{".zip", "application/zip"},
 	{".tar", "application/x-tar"},
+	{".log", "text/plain"},
 	{".gz", "application/gzip"},
 	{".cpp", "text/plain"},
 	{".h", "text/plain"},
@@ -105,11 +106,15 @@ static void handleConfig()
 			blackListedPaths = data.value("blackListedPaths", blackListedPaths);
 
 			std::string custom404Path = data.value("custom404Path", "");
-			if (!custom404Path.empty() && fs::exists(custom404Path))
+
+			if (custom404Path.empty()) return;
+			if (fs::exists(custom404Path))
 			{
 				log("INFO", "Custom 404 page successfully loaded!");
 				custom404Page = readFile(custom404Path);
 			}
+			else
+			log("INFO", "The given 404 page was not found");
 		}
 		catch (const std::exception &error)
 		{
@@ -118,7 +123,7 @@ static void handleConfig()
 	}
 	else
 	{
-		log("INFO", "The configuration file was not found, the program will write one with the default settings.");
+		log("INFO", "The configuration file was not found, the program will write one with the default settings. Restart the server each time you change the config...");
 		std::ofstream file("CppServerConfig.json");
 
 		json configData = json::parse(R"(
@@ -126,13 +131,16 @@ static void handleConfig()
 				"comments": {
 					"_comment0": "This is the current default configuration for the server.",
 					"_comment1": "You can change the server options with this file, it'll overwrite default configurations. But if the server for some reason exists with no warning, a probable cause is the port assigned is in use or another option is malformed, try another port",
-					"_comment2": "You can also add a custom 404 error page too! you set the relative file path as follows: ./path/to/404.html and or ./my404.html",
+					"_comment2": "You can also add a custom 404 error page too! you set the relative file path as follows: /path/to/404.html and or ./my404.html",
 					"_comment3": "Blacklisted files and folders can be added as well, you set them as follows: /somefolder/ and or /private.txt, add as many as you like!",
 					"_comment4": "Custom mime types are a way to define what the server should serve what as, for example a .png file would be servered as image/png"
 				},
 				"hostName": "0.0.0.0",
 				"port": 6432,
-				"blackListedPaths": [],
+				"blackListedPaths": [
+					"/CppServerConfig.json",
+					"/CppServerLog.log"
+				],
 				"customMimeTypes": [],
 				"custom404Path": ""
 			}
@@ -163,46 +171,43 @@ int main(int argc, char *argv[])
 				res.status = httplib::StatusCode::NotFound_404;
 				log("INFO" , "Client " + clientIp + " " + req.method + " " + req.path + "index.html (404 Not Found)");
 				res.set_content("<h3 style='color: red;'>404 - The main index.html doesn't exist on this server.</h3>", "text/html");
-			};
-		}
-	);
+			}; 
+		});
 
 	svr.Get(".*", [&](const httplib::Request &req, httplib::Response &res)
 			{
-				std::string clientIp = req.remote_addr;
-				std::string filePath = fs::current_path().string() + req.path;
-				std::filesystem::path file(filePath);
-				bool isBlackListed = false;
-			
-				for (const std::string& blacklistedPath : blackListedPaths)
-				{
-					if (req.path.rfind(blacklistedPath, 0) == 0)
-					{
-						isBlackListed = true;
-						break;
-					}
-				};
-			
-				if (!isBlackListed)
-				{
-					if (fs::exists(filePath))
-					{
-						res.set_content(readFile(filePath), getMimeType(file.extension().string()));
-						log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (200 OK)");
-					}
-					else
-					{
-						res.status = httplib::StatusCode::NotFound_404;
-						log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (404 Not Found)");
-						res.set_content(custom404Page, "text/html");
-					}
-				}
-				else
-				{
-					res.status = httplib::StatusCode::NotFound_404;
-					log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (404 Not Found)");
-					res.set_content(custom404Page, "text/html");
-				} });
+    std::string clientIp = req.remote_addr;
+    std::string filePath = fs::current_path().string() + req.path;
+    std::filesystem::path file(filePath);
+    bool isBlackListed = false;
+    
+    for (const std::string& blacklistedPath : blackListedPaths)
+    {
+        if (req.path.rfind(blacklistedPath, 0) == 0)
+        {
+			isBlackListed = true;
+            break;
+        }
+    };
+
+    if (fs::exists(filePath) && !isBlackListed)
+    {
+        res.set_content(readFile(filePath), getMimeType(file.extension().string()));
+        log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (200 OK)");
+    }
+	else if (isBlackListed)
+	{
+        log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (403 Forbidden)");
+        res.status = httplib::StatusCode::Forbidden_403;
+		res.set_content("403 - Forbidden <a href='/'>go back home</a>", "text/html");
+	}
+    else
+    {
+        res.status = httplib::StatusCode::NotFound_404;
+        log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (404 Not Found)");
+        res.set_content(custom404Page, "text/html");
+    }; 
+});
 
 	try
 	{
@@ -211,6 +216,6 @@ int main(int argc, char *argv[])
 	}
 	catch (std::exception &error)
 	{
-		log("ERROR", "An error occured while running the server program: " + std::string(error.what()));
+		log("ERROR", "The provided port is in use! choose another one");
 	}
 };
