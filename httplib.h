@@ -8,7 +8,7 @@
 #ifndef CPPHTTPLIB_HTTPLIB_H
 #define CPPHTTPLIB_HTTPLIB_H
 
-#define CPPHTTPLIB_VERSION "0.19.0"
+#define CPPHTTPLIB_VERSION "0.20.0"
 
 /*
  * Configuration
@@ -310,6 +310,10 @@ using socket_t = int;
 #ifdef CPPHTTPLIB_BROTLI_SUPPORT
 #include <brotli/decode.h>
 #include <brotli/encode.h>
+#endif
+
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+#include <zstd.h>
 #endif
 
 /*
@@ -2445,7 +2449,7 @@ ssize_t send_socket(socket_t sock, const void *ptr, size_t size, int flags);
 
 ssize_t read_socket(socket_t sock, void *ptr, size_t size, int flags);
 
-enum class EncodingType { None = 0, Gzip, Brotli };
+enum class EncodingType { None = 0, Gzip, Brotli, Zstd };
 
 EncodingType encoding_type(const Request &req, const Response &res);
 
@@ -2555,6 +2559,34 @@ public:
 private:
   BrotliDecoderResult decoder_r;
   BrotliDecoderState *decoder_s = nullptr;
+};
+#endif
+
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+class zstd_compressor : public compressor {
+public:
+  zstd_compressor();
+  ~zstd_compressor();
+
+  bool compress(const char *data, size_t data_length, bool last,
+                Callback callback) override;
+
+private:
+  ZSTD_CCtx *ctx_ = nullptr;
+};
+
+class zstd_decompressor : public decompressor {
+public:
+  zstd_decompressor();
+  ~zstd_decompressor();
+
+  bool is_valid() const override;
+
+  bool decompress(const char *data, size_t data_length,
+                  Callback callback) override;
+
+private:
+  ZSTD_DCtx *ctx_ = nullptr;
 };
 #endif
 
@@ -2919,7 +2951,7 @@ inline std::string decode_url(const std::string &s,
 
 inline std::string file_extension(const std::string &path) {
   std::smatch m;
-  static auto re = std::regex("\\.([a-zA-Z0-9]+)$");
+  thread_local auto re = std::regex("\\.([a-zA-Z0-9]+)$");
   if (std::regex_search(path, m, re)) { return m[1].str(); }
   return std::string();
 }
@@ -3949,6 +3981,12 @@ inline EncodingType encoding_type(const Request &req, const Response &res) {
   if (ret) { return EncodingType::Gzip; }
 #endif
 
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+  // TODO: 'Accept-Encoding' has zstd, not zstd;q=0
+  ret = s.find("zstd") != std::string::npos;
+  if (ret) { return EncodingType::Zstd; }
+#endif
+
   return EncodingType::None;
 }
 
@@ -4157,6 +4195,61 @@ inline bool brotli_decompressor::decompress(const char *data,
 }
 #endif
 
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+inline zstd_compressor::zstd_compressor() {
+  ctx_ = ZSTD_createCCtx();
+  ZSTD_CCtx_setParameter(ctx_, ZSTD_c_compressionLevel, ZSTD_fast);
+}
+
+inline zstd_compressor::~zstd_compressor() { ZSTD_freeCCtx(ctx_); }
+
+inline bool zstd_compressor::compress(const char *data, size_t data_length,
+                                      bool last, Callback callback) {
+  std::array<char, CPPHTTPLIB_COMPRESSION_BUFSIZ> buff{};
+
+  ZSTD_EndDirective mode = last ? ZSTD_e_end : ZSTD_e_continue;
+  ZSTD_inBuffer input = {data, data_length, 0};
+
+  bool finished;
+  do {
+    ZSTD_outBuffer output = {buff.data(), CPPHTTPLIB_COMPRESSION_BUFSIZ, 0};
+    size_t const remaining = ZSTD_compressStream2(ctx_, &output, &input, mode);
+
+    if (ZSTD_isError(remaining)) { return false; }
+
+    if (!callback(buff.data(), output.pos)) { return false; }
+
+    finished = last ? (remaining == 0) : (input.pos == input.size);
+
+  } while (!finished);
+
+  return true;
+}
+
+inline zstd_decompressor::zstd_decompressor() { ctx_ = ZSTD_createDCtx(); }
+
+inline zstd_decompressor::~zstd_decompressor() { ZSTD_freeDCtx(ctx_); }
+
+inline bool zstd_decompressor::is_valid() const { return ctx_ != nullptr; }
+
+inline bool zstd_decompressor::decompress(const char *data, size_t data_length,
+                                          Callback callback) {
+  std::array<char, CPPHTTPLIB_COMPRESSION_BUFSIZ> buff{};
+  ZSTD_inBuffer input = {data, data_length, 0};
+
+  while (input.pos < input.size) {
+    ZSTD_outBuffer output = {buff.data(), CPPHTTPLIB_COMPRESSION_BUFSIZ, 0};
+    size_t const remaining = ZSTD_decompressStream(ctx_, &output, &input);
+
+    if (ZSTD_isError(remaining)) { return false; }
+
+    if (!callback(buff.data(), output.pos)) { return false; }
+  }
+
+  return true;
+}
+#endif
+
 inline bool has_header(const Headers &headers, const std::string &key) {
   return headers.find(key) != headers.end();
 }
@@ -4296,7 +4389,8 @@ inline bool read_content_without_length(Stream &strm,
   uint64_t r = 0;
   for (;;) {
     auto n = strm.read(buf, CPPHTTPLIB_RECV_BUFSIZ);
-    if (n <= 0) { return false; }
+    if (n == 0) { return true; }
+    if (n < 0) { return false; }
 
     if (!out(buf, static_cast<size_t>(n), r, 0)) { return false; }
     r += static_cast<uint64_t>(n);
@@ -4394,6 +4488,13 @@ bool prepare_content_receiver(T &x, int &status,
     } else if (encoding.find("br") != std::string::npos) {
 #ifdef CPPHTTPLIB_BROTLI_SUPPORT
       decompressor = detail::make_unique<brotli_decompressor>();
+#else
+      status = StatusCode::UnsupportedMediaType_415;
+      return false;
+#endif
+    } else if (encoding == "zstd") {
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+      decompressor = detail::make_unique<zstd_decompressor>();
 #else
       status = StatusCode::UnsupportedMediaType_415;
       return false;
@@ -4912,7 +5013,7 @@ public:
             file_.content_type =
                 trim_copy(header.substr(str_len(header_content_type)));
           } else {
-            static const std::regex re_content_disposition(
+            thread_local const std::regex re_content_disposition(
                 R"~(^Content-Disposition:\s*form-data;\s*(.*)$)~",
                 std::regex_constants::icase);
 
@@ -4935,7 +5036,7 @@ public:
               it = params.find("filename*");
               if (it != params.end()) {
                 // Only allow UTF-8 encoding...
-                static const std::regex re_rfc5987_encoding(
+                thread_local const std::regex re_rfc5987_encoding(
                     R"~(^UTF-8''(.+?)$)~", std::regex_constants::icase);
 
                 std::smatch m2;
@@ -5100,7 +5201,7 @@ inline std::string random_string(size_t length) {
   constexpr const char data[] =
       "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-  static thread_local std::mt19937 engine([]() {
+  thread_local auto engine([]() {
     // std::random_device might actually be deterministic on some
     // platforms, but due to lack of support in the c++ standard library,
     // doing better requires either some ugly hacks or breaking portability.
@@ -5622,7 +5723,8 @@ inline bool parse_www_authenticate(const Response &res,
                                    bool is_proxy) {
   auto auth_key = is_proxy ? "Proxy-Authenticate" : "WWW-Authenticate";
   if (res.has_header(auth_key)) {
-    static auto re = std::regex(R"~((?:(?:,\s*)?(.+?)=(?:"(.*?)"|([^,]*))))~");
+    thread_local auto re =
+        std::regex(R"~((?:(?:,\s*)?(.+?)=(?:"(.*?)"|([^,]*))))~");
     auto s = res.get_header_value(auth_key);
     auto pos = s.find(' ');
     if (pos != std::string::npos) {
@@ -5706,7 +5808,7 @@ inline void hosted_at(const std::string &hostname,
 inline std::string append_query_params(const std::string &path,
                                        const Params &params) {
   std::string path_with_query = path;
-  const static std::regex re("[^?]+\\?.*");
+  thread_local const std::regex re("[^?]+\\?.*");
   auto delm = std::regex_match(path, re) ? '&' : '?';
   path_with_query += delm + detail::params_to_query_str(params);
   return path_with_query;
@@ -6480,7 +6582,7 @@ inline bool Server::parse_request_line(const char *s, Request &req) const {
     if (count != 3) { return false; }
   }
 
-  static const std::set<std::string> methods{
+  thread_local const std::set<std::string> methods{
       "GET",     "HEAD",    "POST",  "PUT",   "DELETE",
       "CONNECT", "OPTIONS", "TRACE", "PATCH", "PRI"};
 
@@ -6634,6 +6736,10 @@ Server::write_content_with_provider(Stream &strm, const Request &req,
       } else if (type == detail::EncodingType::Brotli) {
 #ifdef CPPHTTPLIB_BROTLI_SUPPORT
         compressor = detail::make_unique<detail::brotli_compressor>();
+#endif
+      } else if (type == detail::EncodingType::Zstd) {
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+        compressor = detail::make_unique<detail::zstd_compressor>();
 #endif
       } else {
         compressor = detail::make_unique<detail::nocompressor>();
@@ -7049,6 +7155,8 @@ inline void Server::apply_ranges(const Request &req, Response &res,
             res.set_header("Content-Encoding", "gzip");
           } else if (type == detail::EncodingType::Brotli) {
             res.set_header("Content-Encoding", "br");
+          } else if (type == detail::EncodingType::Zstd) {
+            res.set_header("Content-Encoding", "zstd");
           }
         }
       }
@@ -7088,6 +7196,11 @@ inline void Server::apply_ranges(const Request &req, Response &res,
 #ifdef CPPHTTPLIB_BROTLI_SUPPORT
         compressor = detail::make_unique<detail::brotli_compressor>();
         content_encoding = "br";
+#endif
+      } else if (type == detail::EncodingType::Zstd) {
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+        compressor = detail::make_unique<detail::zstd_compressor>();
+        content_encoding = "zstd";
 #endif
       }
 
@@ -7469,9 +7582,9 @@ inline bool ClientImpl::read_response_line(Stream &strm, const Request &req,
   if (!line_reader.getline()) { return false; }
 
 #ifdef CPPHTTPLIB_ALLOW_LF_AS_LINE_TERMINATOR
-  const static std::regex re("(HTTP/1\\.[01]) (\\d{3})(?: (.*?))?\r?\n");
+  thread_local const std::regex re("(HTTP/1\\.[01]) (\\d{3})(?: (.*?))?\r?\n");
 #else
-  const static std::regex re("(HTTP/1\\.[01]) (\\d{3})(?: (.*?))?\r\n");
+  thread_local const std::regex re("(HTTP/1\\.[01]) (\\d{3})(?: (.*?))?\r\n");
 #endif
 
   std::cmatch m;
@@ -7703,7 +7816,7 @@ inline bool ClientImpl::redirect(Request &req, Response &res, Error &error) {
   auto location = res.get_header_value("location");
   if (location.empty()) { return false; }
 
-  const static std::regex re(
+  thread_local const std::regex re(
       R"((?:(https?):)?(?://(?:\[([a-fA-F\d:]+)\]|([^:/?#]+))(?::(\d+))?)?([^?#]*)(\?[^#]*)?(?:#.*)?)");
 
   std::smatch m;
@@ -7812,6 +7925,10 @@ inline bool ClientImpl::write_request(Stream &strm, Request &req,
 #ifdef CPPHTTPLIB_ZLIB_SUPPORT
       if (!accept_encoding.empty()) { accept_encoding += ", "; }
       accept_encoding += "gzip, deflate";
+#endif
+#ifdef CPPHTTPLIB_ZSTD_SUPPORT
+      if (!accept_encoding.empty()) { accept_encoding += ", "; }
+      accept_encoding += "zstd";
 #endif
       req.set_header("Accept-Encoding", accept_encoding);
     }

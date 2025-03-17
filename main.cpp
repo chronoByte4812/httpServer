@@ -8,12 +8,12 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 httplib::Server svr;
-std::string custom404Page = "<h3 style='color: red;'>404 - Not found: That file not found on this server.</h1>";
+std::string custom404Page = "<h3 style='color: red;'>404 - Not found: That file not found on this server.</h3>";
 std::string configFile = (fs::current_path() / "CppServerConfig.json").string();
 std::vector<std::string> blackListedPaths;
 std::string ip = "0.0.0.0";
 int port = 6432;
-std::unordered_map<std::string, std::string> mime_types = {
+std::map<std::string, std::string, std::less<std::string>, std::allocator<std::pair<const std::string, std::string>>> mime_types = {
 	{".html", "text/html"},
 	{".css", "text/css"},
 	{".js", "text/javascript"},
@@ -33,15 +33,6 @@ std::unordered_map<std::string, std::string> mime_types = {
 	{".h", "text/plain"},
 };
 
-static std::string getMimeType(const std::string &extension)
-{
-	auto it = mime_types.find(extension);
-	if (it != mime_types.end())
-		return it->second;
-	else
-		return "application/octet-stream";
-};
-
 static std::string readFile(const std::string &filePath)
 {
 	std::ostringstream contents;
@@ -56,8 +47,7 @@ static std::string readFile(const std::string &filePath)
 
 static void log(const std::string logType, std::string message)
 {
-	auto now = std::chrono::system_clock::now();
-	std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+	std::time_t now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::ofstream logFile("./CppServerLog.log", std::ios::app);
 	std::tm now_tm;
 #ifdef _WIN32
@@ -107,14 +97,15 @@ static void handleConfig()
 
 			std::string custom404Path = data.value("custom404Path", "");
 
-			if (custom404Path.empty()) return;
+			if (custom404Path.empty())
+				return;
 			if (fs::exists(custom404Path))
 			{
 				log("INFO", "Custom 404 page successfully loaded!");
 				custom404Page = readFile(custom404Path);
 			}
 			else
-			log("INFO", "The given 404 page was not found");
+				log("INFO", "The given 404 page was not found");
 		}
 		catch (const std::exception &error)
 		{
@@ -171,14 +162,13 @@ int main(int argc, char *argv[])
 				res.status = httplib::StatusCode::NotFound_404;
 				log("INFO" , "Client " + clientIp + " " + req.method + " " + req.path + "index.html (404 Not Found)");
 				res.set_content("<h3 style='color: red;'>404 - The main index.html doesn't exist on this server.</h3>", "text/html");
-			}; 
-		});
+			}; });
 
 	svr.Get(".*", [&](const httplib::Request &req, httplib::Response &res)
 			{
     std::string clientIp = req.remote_addr;
     std::string filePath = fs::current_path().string() + req.path;
-    std::filesystem::path file(filePath);
+	std::string content_type = httplib::detail::find_content_type(filePath, mime_types, "application/octet-stream");
     bool isBlackListed = false;
     
     for (const std::string& blacklistedPath : blackListedPaths)
@@ -189,25 +179,24 @@ int main(int argc, char *argv[])
             break;
         }
     };
-
+	
     if (fs::exists(filePath) && !isBlackListed)
     {
-        res.set_content(readFile(filePath), getMimeType(file.extension().string()));
+        res.set_content(readFile(filePath), content_type);
         log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (200 OK)");
     }
 	else if (isBlackListed)
 	{
         log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (403 Forbidden)");
         res.status = httplib::StatusCode::Forbidden_403;
-		res.set_content("403 - Forbidden <a href='/'>go back home</a>", "text/html");
+		res.set_content("<h3 style='color: red;'>403 - Forbidden <a href='/'>go back home</a></styles>", "text/html");
 	}
     else
     {
         res.status = httplib::StatusCode::NotFound_404;
         log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (404 Not Found)");
         res.set_content(custom404Page, "text/html");
-    }; 
-});
+    }; });
 
 	try
 	{
