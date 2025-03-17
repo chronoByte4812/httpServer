@@ -189,7 +189,7 @@ int main(int argc, char *argv[])
 	{
         log("INFO", "Client " + clientIp + " " + req.method + " " + req.path + " (403 Forbidden)");
         res.status = httplib::StatusCode::Forbidden_403;
-		res.set_content("<h3 style='color: red;'>403 - Forbidden <a href='/'>go back home</a></styles>", "text/html");
+		res.set_content("<h3 style='color: red;'>403 - Forbidden <a href='/'>go back home</a></h3>", "text/html");
 	}
     else
     {
