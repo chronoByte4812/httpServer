@@ -91,7 +91,7 @@ static void handleConfig()
 				};
 			};
 
-			ip = data.value("hostName", ip);
+			ip = data.value("ip", ip);
 			port = data.value("port", port);
 			blackListedPaths = data.value("blackListedPaths", blackListedPaths);
 
@@ -126,7 +126,7 @@ static void handleConfig()
 					"_comment3": "Blacklisted files and folders can be added as well, you set them as follows: /somefolder/ and or /private.txt, add as many as you like!",
 					"_comment4": "Custom mime types are a way to define what the server should serve what as, for example a .png file would be servered as image/png"
 				},
-				"hostName": "0.0.0.0",
+				"ip": "0.0.0.0",
 				"port": 6432,
 				"blackListedPaths": [
 					"/CppServerConfig.json",
