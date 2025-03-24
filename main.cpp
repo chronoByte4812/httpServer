@@ -94,7 +94,6 @@ static void handleConfig()
 			ip = data.value("ip", ip);
 			port = data.value("port", port);
 			blackListedPaths = data.value("blackListedPaths", blackListedPaths);
-
 			std::string custom404Path = data.value("custom404Path", "");
 
 			if (custom404Path.empty())
@@ -107,7 +106,7 @@ static void handleConfig()
 			else
 				log("INFO", "The given 404 page was not found");
 		}
-		catch (const std::exception &error)
+		catch (std::exception &error)
 		{
 			log("ERROR", "Failed to parse JSON data: " + std::string(error.what()));
 		};
