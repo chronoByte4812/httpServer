@@ -45,8 +45,14 @@ static std::string readFile(const std::string &filePath)
 	return contents.str();
 };
 
-static void log(const std::string logType, std::string message)
+static void log(const std::string &logType, const std::string &message)
 {
+	static const std::unordered_map<std::string, std::string> validTypes = {
+		{"INFO", "\033[32m"},
+		{"WARNING", "\033[33m"},
+		{"ERROR", "\033[31m"},
+		{"DEBUG", "\033[36m"}};
+
 	std::time_t now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	std::ofstream logFile("./CppServerLog.log", std::ios::app);
 	std::tm now_tm;
@@ -57,9 +63,9 @@ static void log(const std::string logType, std::string message)
 #endif
 	std::ostringstream currentTime;
 	currentTime << std::put_time(&now_tm, "%d-%m-%y %H:%M:%S");
-	std::string formattedLog = "[" + currentTime.str() + "] [" + logType + "] - " + message + "\n\n";
 
-	std::cout << formattedLog;
+	std::string formattedLog = "[" + currentTime.str() + "] [" + logType + "] - " + message + "\n";
+	std::cout << validTypes.at(logType) << formattedLog << "\033[0m";
 	logFile << formattedLog;
 
 	logFile.close();
