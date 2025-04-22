@@ -9,7 +9,7 @@ if [ $? -eq 0 ]; then echo "Nice the binary was successfully built!";
 else echo "\nBinary failed to build!";
 fi
 
-if [[ "$1" == "--runAfterBuild" ]]; then
-    echo "--runAfterBuild flag! the binary has started";
+if [[ "$1" == "-r" ]]; then
+    echo "-r flag! the binary has started";
     ./server
 fi

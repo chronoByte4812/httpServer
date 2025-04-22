@@ -188,6 +188,9 @@ using ssize_t = long;
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+// afunix.h uses types declared in winsock2.h, so has to be included after it.
+#include <afunix.h>
+
 #ifndef WSA_FLAG_NO_HANDLE_INHERIT
 #define WSA_FLAG_NO_HANDLE_INHERIT 0x80
 #endif
@@ -3365,7 +3368,7 @@ private:
   time_t write_timeout_sec_;
   time_t write_timeout_usec_;
   time_t max_timeout_msec_;
-  const std::chrono::time_point<std::chrono::steady_clock> start_time;
+  const std::chrono::time_point<std::chrono::steady_clock> start_time_;
 
   std::vector<char> read_buff_;
   size_t read_buff_off_ = 0;
@@ -3403,7 +3406,7 @@ private:
   time_t write_timeout_sec_;
   time_t write_timeout_usec_;
   time_t max_timeout_msec_;
-  const std::chrono::time_point<std::chrono::steady_clock> start_time;
+  const std::chrono::time_point<std::chrono::steady_clock> start_time_;
 };
 #endif
 
@@ -3538,7 +3541,6 @@ socket_t create_socket(const std::string &host, const std::string &ip, int port,
     hints.ai_flags = socket_flags;
   }
 
-#ifndef _WIN32
   if (hints.ai_family == AF_UNIX) {
     const auto addrlen = host.length();
     if (addrlen > sizeof(sockaddr_un::sun_path)) { return INVALID_SOCKET; }
@@ -3562,10 +3564,18 @@ socket_t create_socket(const std::string &host, const std::string &ip, int port,
           sizeof(addr) - sizeof(addr.sun_path) + addrlen);
 
 #ifndef SOCK_CLOEXEC
+#ifndef _WIN32
       fcntl(sock, F_SETFD, FD_CLOEXEC);
+#endif
 #endif
 
       if (socket_options) { socket_options(sock); }
+
+#ifdef _WIN32
+      // Setting SO_REUSEADDR seems not to work well with AF_UNIX on windows, so
+      // remove the option.
+      detail::set_socket_opt(sock, SOL_SOCKET, SO_REUSEADDR, 0);
+#endif
 
       bool dummy;
       if (!bind_or_connect(sock, hints, dummy)) {
@@ -3575,7 +3585,6 @@ socket_t create_socket(const std::string &host, const std::string &ip, int port,
     }
     return sock;
   }
-#endif
 
   auto service = std::to_string(port);
 
@@ -6046,6 +6055,8 @@ inline void calc_actual_timeout(time_t max_timeout_msec, time_t duration_msec,
   auto actual_timeout_msec =
       (std::min)(max_timeout_msec - duration_msec, timeout_msec);
 
+  if (actual_timeout_msec < 0) { actual_timeout_msec = 0; }
+
   actual_timeout_sec = actual_timeout_msec / 1000;
   actual_timeout_usec = (actual_timeout_msec % 1000) * 1000;
 }
@@ -6060,7 +6071,7 @@ inline SocketStream::SocketStream(
       read_timeout_usec_(read_timeout_usec),
       write_timeout_sec_(write_timeout_sec),
       write_timeout_usec_(write_timeout_usec),
-      max_timeout_msec_(max_timeout_msec), start_time(start_time),
+      max_timeout_msec_(max_timeout_msec), start_time_(start_time),
       read_buff_(read_buff_size_, 0) {}
 
 inline SocketStream::~SocketStream() = default;
@@ -6158,7 +6169,7 @@ inline socket_t SocketStream::socket() const { return sock_; }
 
 inline time_t SocketStream::duration() const {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
-             std::chrono::steady_clock::now() - start_time)
+             std::chrono::steady_clock::now() - start_time_)
       .count();
 }
 
@@ -9200,7 +9211,7 @@ inline SSLSocketStream::SSLSocketStream(
       read_timeout_usec_(read_timeout_usec),
       write_timeout_sec_(write_timeout_sec),
       write_timeout_usec_(write_timeout_usec),
-      max_timeout_msec_(max_timeout_msec), start_time(start_time) {
+      max_timeout_msec_(max_timeout_msec), start_time_(start_time) {
   SSL_clear_mode(ssl, SSL_MODE_AUTO_RETRY);
 }
 
@@ -9306,7 +9317,7 @@ inline socket_t SSLSocketStream::socket() const { return sock_; }
 
 inline time_t SSLSocketStream::duration() const {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
-             std::chrono::steady_clock::now() - start_time)
+             std::chrono::steady_clock::now() - start_time_)
       .count();
 }
 
