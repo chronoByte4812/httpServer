@@ -12,7 +12,7 @@ std::string custom404Page = "<h3 style='color: red;'>404 - Not found: That file 
 std::string configFile = (fs::current_path() / "CppServerConfig.json").string();
 std::vector<std::string> blackListedPaths;
 std::string ip = "0.0.0.0";
-int port = 6432;
+size_t port = 6432;
 std::map<std::string, std::string, std::less<std::string>, std::allocator<std::pair<const std::string, std::string>>> mime_types = {
 	{".html", "text/html"},
 	{".css", "text/css"},
