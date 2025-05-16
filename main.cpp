@@ -13,7 +13,7 @@ std::string custom404Page = "<h3 style='color: red;'>404 - Not found: That file 
 std::string configFile = (fs::current_path() / "CppServerConfig.json").string();
 std::vector<std::string> blackListedPaths;
 std::string ip = "0.0.0.0";
-size_t port = 6432;
+int port = 6432;
 std::map<std::string, std::string, std::less<std::string>, std::allocator<std::pair<const std::string, std::string>>> mime_types = {
 	{".html", "text/html"},
 	{".css", "text/css"},
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
 		log("INFO", "Server listening on " + ip + ":" + std::to_string(port) + (ip == "0.0.0.0" ? " All network interfaces." : ""));
 		svr.listen(ip, port);
 	}
-	catch (std::exception &error)
+	catch (std::exception)
 	{
 		log("ERROR", "The provided port is in use! choose another one");
 	}
