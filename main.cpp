@@ -8,6 +8,7 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 httplib::Server svr;
+bool useConfig = true;
 std::string custom404Page = "<h3 style='color: red;'>404 - Not found: That file not found on this server.</h3>";
 std::string configFile = (fs::current_path() / "CppServerConfig.json").string();
 std::vector<std::string> blackListedPaths;
@@ -150,7 +151,20 @@ static void handleConfig()
 
 int main(int argc, char *argv[])
 {
-	handleConfig();
+
+	if (argc > 1)
+	{
+		for (size_t i = 1; i < argc; i++)
+		{
+			char *arg = argv[i];
+
+			if (std::strcmp(arg, "--noconfig") == 0)
+				useConfig = false;
+		}
+	}
+
+	if (useConfig == true)
+		handleConfig();
 
 	svr.Get("/", [&](const httplib::Request &req, httplib::Response &res) // Root path (./index.html).
 			{
