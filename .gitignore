@@ -1,4 +1,3 @@
-CppServerLog.log
-CppServerConfig.json
-out/
-.vs/
+.vs
+.vscode
+/out

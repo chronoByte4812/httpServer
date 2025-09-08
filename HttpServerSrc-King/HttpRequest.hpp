@@ -2,26 +2,12 @@
 #define HTTPREQUEST_HPP
 
 #include <unordered_map>
-#include <stdexcept>
 #include <sstream>
-
-#if defined(_WIN32)
-    #include <WinSock2.h>
-    #include <ws2tcpip.h>
-#elif defined(__unix__) || defined(__APPLE__)
-    #include <unistd.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-#endif
-
-#if defined(_WIN32)
-    typedef SOCKET Socket_t;
-#elif defined(__unix__) || defined(__APPLE__)
-    typedef int Socket_t;
-#endif
 
 #include "util/HttpMethod.hpp"
 #include "util/HttpVersion.hpp"
+
+#include "Common.hpp"
 
 typedef std::unordered_map<std::string, std::string> HeadersMap_t;
 class HttpRequest
@@ -29,30 +15,33 @@ class HttpRequest
     friend class HttpServer;
 
 private:
-    std::string m_Path, m_Body;
-    HttpMethod::Method m_Method;
-    HttpVersion::Version m_Version;
-    HeadersMap_t m_Headers;
+    std::string mPath{};
+    std::string mBody{};
+    HttpMethod::Method mMethod{ HttpMethod::GET };
+    HttpVersion::Version mVersion{ HttpVersion::HTTP_1_1 };
+    HeadersMap_t mHeaders{};
 
 protected:
-    Socket_t m_ClientSocket;
-    std::string m_OriginalPath;
+    Socket_t mClientSocket{ 0 };
+    std::string mOriginalPath{};
 
 public:
     HttpRequest(Socket_t clientSocket, const std::string& data);
     ~HttpRequest() = default;
 
-    const std::string& getPath() const { return this->m_Path; };
-    const std::string& getOriginalPath() const { return this->m_OriginalPath; };
-    const std::string& getBody() const { return this->m_Body; };
-    const HeadersMap_t& getHeaders() const { return this->m_Headers; };
+    [[nodiscard]] const std::string& getPath() const { return this->mPath; };
+    [[nodiscard]] const std::string& getOriginalPath() const { return this->mOriginalPath; };
+    [[nodiscard]] const std::string& getBody() const { return this->mBody; };
 
-    std::string getRemoteAddr() const;
-    HttpMethod::Method getMethod() const { return this->m_Method; };
-    HttpVersion::Version getVersion() const { return this->m_Version; };
+    [[nodiscard]] const HeadersMap_t& getHeaders() const { return this->mHeaders; };
+    std::optional<std::string> getHeader(const std::string& name) const;
+
+    [[nodiscard]] std::string getRemoteAddr() const;
+    [[nodiscard]] HttpMethod::Method getMethod() const { return this->mMethod; };
+    [[nodiscard]] HttpVersion::Version getVersion() const { return this->mVersion; };
 
 private:
-    void setOriginalPath(const std::string& path) { this->m_OriginalPath = path; };
+    void setOriginalPath(const std::string& path) { this->mOriginalPath = path; };
 };
 
 #endif // !HTTPREQUEST_HPP

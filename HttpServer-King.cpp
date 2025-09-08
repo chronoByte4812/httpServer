@@ -12,7 +12,8 @@
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
-std::string Page404 = "<h3 style='color: red;'>404 - File Not found</h3>";
+std::string Page404 = "<h3 style='color: red;'>404 - File Not found or file is empty</h3>";
+std::string PageEmpty = "<h3 style='color: red;'>404 - File was found but is empty</h3>";
 std::string Page403 = "<h3 style='color: red;'>403 - File Forbidden</h3>";
 std::string Server_IP = "0.0.0.0";
 std::string Server_Config_Path = (fs::current_path() / "ServerConfig.json").string();
@@ -78,11 +79,11 @@ static void handleConfig()
             if (data.contains("MimeTypesCustom") && data["MimeTypesCustom"].is_object() && data["MimeTypesCustom"].size() > 0)
             {
                 Write_log("INFO", "Custom mime types loaded.");
-                MimeType::s_MimeTypeMap.clear();
+                MimeType::sMimeTypeMap.clear();
 
                 for (auto& [ext, type] : data["MimeTypesCustom"].items())
                 {
-                    MimeType::s_MimeTypeMap[ext] = type;
+                    MimeType::sMimeTypeMap[ext] = type;
                 };
             };
 
@@ -165,11 +166,32 @@ int main(int argc, char *argv[])
     if (useConfig == true)
         handleConfig();
 
-    KingHttpServer.use("/tests", HttpMethod::POST, [&](const HttpRequest req, HttpResponse res) {
+    KingHttpServer.use("/", HttpMethod::GET, [](HttpRequest req, HttpResponse& res, const NextFn& next) {
+        std::string clientIp = req.getRemoteAddr();
+        std::string path = req.getPath();
+        std::string filePath = fs::current_path().string() + "/index.html";
+        std::string ReadFile = readFile(filePath);
+        std::string content_type = MimeType::getMimeType(filePath);
+        std::string method = HttpMethod::toString(req.getMethod());
 
+        if (!fs::exists(filePath) || ReadFile.empty()) { // File doesn't exist or file is empty.
+
+            Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (404 Not Found)");
+
+            res.setStatus(HttpStatus::NotFound);
+            res.setHeader("Content-Type", "text/html");
+            res.send(Page404);
+        }
+        else { // The file exists.
+            Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (200 OK)");
+
+            res.setStatus(HttpStatus::OK);
+            res.setHeader("Content-Type", content_type);
+            res.send(ReadFile);
+        }
     });
 
-    KingHttpServer.use(R"(/.*)", HttpMethod::GET, [&](const HttpRequest req, HttpResponse res)
+    KingHttpServer.use(R"(/.*)", HttpMethod::GET, [](HttpRequest req, HttpResponse& res, const NextFn& next)
                        {
             std::string clientIp = req.getRemoteAddr();
             std::string path = req.getPath();
