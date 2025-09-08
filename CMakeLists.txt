@@ -2,7 +2,7 @@
 # project specific logic here.
 #
 
-cmake_minimum_required (VERSION 3.13)
+cmake_minimum_required (VERSION 3.16)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -12,18 +12,29 @@ endif()
 
 project ("HttpServer-King")
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Add source to this project's executable.
-add_executable(HttpServer-King "HttpServer-King.cpp" "json.h" )
+add_executable(HttpServer-King "HttpServer-King.cpp" "json.h")
+
+if (MSVC)
+    add_definitions(-DNOMINMAX)
+endif()
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET HttpServer-King PROPERTY CXX_STANDARD 20)
+  set_property(TARGET HttpServer-King PROPERTY CXX_STANDARD 23)
 endif()
+
+find_package(OpenSSL REQUIRED)
+target_link_libraries(HttpServer-King PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+target_compile_features(HttpServer-King PUBLIC cxx_std_23)
 
 add_subdirectory("HttpServerSrc-King")
 
 target_link_libraries(HttpServer-King PRIVATE HttpServerSrc-King)
 
 # TODO: Add tests and install targets if needed.
+
+add_subdirectory("HttpServer_dimmed-King")

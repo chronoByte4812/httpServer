@@ -1,0 +1,43 @@
+#ifndef WEBSOCKET_HPP
+#define WEBSOCKET_HPP
+
+#include <functional>
+#include <span>
+#include <string>
+
+#include "Common.hpp"
+#include "HttpRequest.hpp"
+
+class WebSocket {
+protected:
+    Socket_t mClientSocket{ 0 };
+
+public:
+    explicit WebSocket(const Socket_t clientSocket)
+        : mClientSocket(clientSocket) {};
+
+    void send(const std::string& text) const;
+    void send(const std::vector<uint8_t>& binary) const;
+    void send(std::span<const uint8_t> binary) const;
+    void closeSocket() const;
+
+private:
+    void sendFrame(uint8_t opcode, std::span<const uint8_t> data) const;
+};
+
+struct WebSocketHandler {
+    using RequestHandlerNoNext   = std::function<void(const HttpRequest&, HttpResponse&)>;
+
+    std::variant<Middleware, RequestHandlerNoNext> onRequest =
+        [] (const HttpRequest&, HttpResponse&, const NextFn& next) {
+            next();
+        };
+    std::function<void(WebSocket&)> onOpen = [] (WebSocket&) {};
+
+    std::function<void(WebSocket&, const std::string&)> onText = [] (WebSocket&, const std::string&) {};
+    std::function<void(WebSocket&, std::span<const uint8_t>)> onBinary = [] (WebSocket&, std::span<const uint8_t>) {};
+
+    std::function<void(WebSocket&)> onClose = [] (WebSocket&) {};
+};
+
+#endif //WEBSOCKET_HPP
