@@ -1,9 +1,9 @@
 #ifndef WEBSOCKET_HPP
 #define WEBSOCKET_HPP
 
-#include <functional>
 #include <span>
 #include <string>
+#include <variant>
 
 #include "Common.hpp"
 #include "HttpRequest.hpp"
@@ -11,10 +11,13 @@
 class WebSocket {
 protected:
     Socket_t mClientSocket{ 0 };
+    HttpRequest mHttpRequest{ 0, "" };
 
 public:
-    explicit WebSocket(const Socket_t clientSocket)
-        : mClientSocket(clientSocket) {};
+    explicit WebSocket(const Socket_t clientSocket, const HttpRequest& httpRequest)
+        : mClientSocket(clientSocket), mHttpRequest(httpRequest) {};
+
+    [[nodiscard]] const HttpRequest& getHttpRequest() const { return this->mHttpRequest; };
 
     void send(const std::string& text) const;
     void send(const std::vector<uint8_t>& binary) const;

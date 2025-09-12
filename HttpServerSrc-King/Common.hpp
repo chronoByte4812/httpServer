@@ -23,8 +23,6 @@
 #include "util/HttpMethod.hpp"
 #include "util/HttpVersion.hpp"
 
-#include "Common.hpp"
-
 class HttpRequest;
 class HttpResponse;
 

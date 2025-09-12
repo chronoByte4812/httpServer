@@ -96,7 +96,7 @@ private:
     void processRequests(int workerId);
 
     void upgradeConnection(Socket_t socket, const HttpRequest& request, std::vector<uint8_t>& buffer);
-    static void upgradeWebSocket(HttpResponse& response, const std::string& key) ;
+    static void upgradeWebSocket(HttpResponse& response, const std::string& mainKey) ;
     static bool isUpgradeRequest(const HttpRequest& request);
 };
 

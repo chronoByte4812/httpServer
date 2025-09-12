@@ -345,7 +345,7 @@ void HttpServer::upgradeConnection(Socket_t socket, const HttpRequest& request, 
     std::function next = [&]() {
         response.send();
 
-        WebSocket webSocket{ socket };
+        WebSocket webSocket{ socket, request };
         handlers.onOpen(webSocket);
 
         std::vector<uint8_t> fragmentBuffer;
