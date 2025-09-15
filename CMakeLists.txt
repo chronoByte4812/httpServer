@@ -11,6 +11,7 @@ if (POLICY CMP0141)
 endif()
 
 project ("HttpServer-King")
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
