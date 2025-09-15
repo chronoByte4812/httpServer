@@ -12,7 +12,7 @@
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
-std::string Page404 = "<h3 style='color: red;'>404 - File Not found or file is empty</h3>";
+std::string Page404 = "<h3 style='color: red;'>404 - File Not found</h3>";
 std::string PageEmpty = "<h3 style='color: red;'>404 - File was found but is empty</h3>";
 std::string Page403 = "<h3 style='color: red;'>403 - File Forbidden</h3>";
 std::string Server_IP = "0.0.0.0";
@@ -217,7 +217,15 @@ int main(int argc, char *argv[])
                 res.setHeader("Content-Type", "text/html");
                 res.send(Page403);
             }
-            else if (!fs::exists(filePath) || ReadFile.empty()) { // File doesn't exist or file is empty.
+            else if (ReadFile.empty()) // File found but is empty
+            {
+                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (File found but empty)");
+
+                res.setStatus(HttpStatus::NotFound);
+                res.setHeader("Content-Type", "text/html");
+                res.send(PageEmpty);
+            }
+            else if (!fs::exists(filePath)) { // File doesn't exist
                 Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (404 Not Found)");
 
                 res.setStatus(HttpStatus::NotFound);

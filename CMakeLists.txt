@@ -2,7 +2,7 @@
 # project specific logic here.
 #
 
-cmake_minimum_required (VERSION 3.16)
+cmake_minimum_required (VERSION 3.31)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -35,7 +35,5 @@ target_compile_features(HttpServer-King PUBLIC cxx_std_23)
 add_subdirectory("HttpServerSrc-King")
 
 target_link_libraries(HttpServer-King PRIVATE HttpServerSrc-King)
-
-# TODO: Add tests and install targets if needed.
 
 add_subdirectory("HttpServer_dimmed-King")
