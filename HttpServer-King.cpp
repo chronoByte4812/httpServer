@@ -1,4 +1,6 @@
 ﻿// HttpServer-King.cpp : Defines the entry point for the application.
+// Wednesday, 26 August 2025, 11:13 PM
+// Edited on Saturday, 04 October 2025, 3:42 PM
 //
 
 #include "./HttpServerSrc-King/HttpServer.hpp"
@@ -10,6 +12,8 @@
 #include <fstream>
 #include <iostream>
 
+// "useFileLogging" to toggle weather to write to the logs file, saving space and memory.
+
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 std::string Page404 = "<h3 style='color: red;'>404 - File Not found</h3>";
@@ -19,6 +23,7 @@ std::string Server_IP = "0.0.0.0";
 std::string Server_Config_Path = (fs::current_path() / "ServerConfig.json").string();
 std::vector<std::string> BlackListPaths;
 bool useConfig = true;
+bool useFileLogging = true;
 int Server_Port = 6432;
 HttpServer KingHttpServer;
 
@@ -58,7 +63,9 @@ static void Write_log(const std::string &logType, const std::string &message)
 
     std::string formattedLog = "[" + currentTime.str() + "] [" + logType + "] - " + message + "\n";
     std::cout << validTypes.at(logType) << formattedLog << std::endl;
-    logFile << formattedLog;
+
+    if (useFileLogging == true)
+        logFile << formattedLog;
 
     logFile.close();
 };
@@ -75,21 +82,25 @@ static void handleConfig()
             json data = json::parse(dataFile);
             std::string Page404Custom = data.value("Page404Custom", "");
             std::string Page403Custom = data.value("Page403Custom", "");
+            Server_IP = data.value("ip", Server_IP);
+            Server_Port = data.value("port", Server_Port);
+            BlackListPaths = data.value("BlackListPaths", BlackListPaths);
+            useFileLogging = data.value("useFileLogging", useFileLogging);
 
             if (data.contains("MimeTypesCustom") && data["MimeTypesCustom"].is_object() && data["MimeTypesCustom"].size() > 0)
             {
                 Write_log("INFO", "Custom mime types loaded.");
+
                 MimeType::sMimeTypeMap.clear();
 
-                for (auto& [ext, type] : data["MimeTypesCustom"].items())
+                for (auto &[ext, type] : data["MimeTypesCustom"].items())
                 {
                     MimeType::sMimeTypeMap[ext] = type;
                 };
             };
 
-            Server_IP = data.value("ip", Server_IP);
-            Server_Port = data.value("port", Server_Port);
-            BlackListPaths = data.value("BlackListPaths", BlackListPaths);
+            if (useFileLogging == false)
+                Write_log("INFO", "Logging to file is off");
 
             if (!Page404Custom.empty())
             {
@@ -131,6 +142,7 @@ static void handleConfig()
                     "BlackListPaths": "The BlackListPaths is a list of paths that the Server will block all Clients access to.",
                     "MimeTypesCustom": "The MimeTypesCustom is a list of custom MimeTypes that the Server will use and overwrite default ones.",
                     "Page403Custom": "The Page403Custom is a custom page that the Server will use when a Client tries to access a BlackListed path.",
+                    "useFileLogging": "Tells the server not to write any log files to the disk",
                     "Page404Custom": "The Page404Custom is a custom page that the Server will use when a Client tries to access a file that does not exist."
                 },
                 "BlackListPaths": [
@@ -138,6 +150,7 @@ static void handleConfig()
                     "/ServerLogs.log"
             ],
                 "MimeTypesCustom": {},
+                "useFileLogging": true,
                 "Page403Custom": "",
                 "Page404Custom": "",
                 "ip": "0.0.0.0",
@@ -156,17 +169,21 @@ int main(int argc, char *argv[])
     {
         for (int i = 1; i < argc; i++)
         {
-            char* arg = argv[i];
+            char *arg = argv[i];
 
             if (std::strcmp(arg, "--noconfig") == 0)
                 useConfig = false;
+
+            if (std::strcmp(arg, "--nologfile") == 0)
+                useFileLogging = false;
         };
     };
 
     if (useConfig == true)
         handleConfig();
 
-    KingHttpServer.use("/", HttpMethod::GET, [](HttpRequest req, HttpResponse& res, const NextFn& next) {
+    KingHttpServer.use("/", HttpMethod::GET, [](HttpRequest req, HttpResponse &res, const NextFn &next)
+                       {
         std::string clientIp = req.getRemoteAddr();
         std::string path = req.getPath();
         std::string filePath = fs::current_path().string() + "/index.html";
@@ -191,7 +208,7 @@ int main(int argc, char *argv[])
         }
     });
 
-    KingHttpServer.use(R"(/.*)", HttpMethod::GET, [](HttpRequest req, HttpResponse& res, const NextFn& next)
+    KingHttpServer.use(R"(/.*)", HttpMethod::GET, [](HttpRequest req, HttpResponse &res, const NextFn &next)
                        {
             std::string clientIp = req.getRemoteAddr();
             std::string path = req.getPath();
@@ -207,7 +224,7 @@ int main(int argc, char *argv[])
                 {
                     isBlackListed = true;
                     break;
-                }
+                };
             };
 
             if (isBlackListed) { // Private file.
@@ -238,7 +255,8 @@ int main(int argc, char *argv[])
                 res.setStatus(HttpStatus::OK);
                 res.setHeader("Content-Type", content_type);
                 res.send(ReadFile);
-            } });
+            }
+        });
 
     try
     {
