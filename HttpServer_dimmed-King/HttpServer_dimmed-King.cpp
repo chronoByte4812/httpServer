@@ -1,4 +1,4 @@
-﻿// HttpServer-King.cpp : Defines the entry point for the application.
+﻿// HttpServer_dimmed-King.cpp : Defines the entry point for the application.
 //
 
 #include "../HttpServerSrc-King/HttpServer.hpp"
@@ -83,8 +83,8 @@ int main(int argc, char *argv[])
         }
     });
 
-    KingHttpServer.use(R"(/.*)", HttpMethod::GET, [&](const HttpRequest req, HttpResponse &res, const NextFn& next)
-                       {
+    KingHttpServer.use(R"(/.*)", HttpMethod::GET, [&](const HttpRequest req, HttpResponse& res, const NextFn& next)
+        {
             std::string clientIp = req.getRemoteAddr();
             std::string path = req.getPath();
             std::string filePath = path == "/" ? fs::current_path().string() + "/index.html" : fs::current_path().string() + path;
@@ -92,20 +92,29 @@ int main(int argc, char *argv[])
             std::string content_type = MimeType::getMimeType(filePath);
             std::string method = HttpMethod::toString(req.getMethod());
 
-            if (!fs::exists(filePath) || ReadFile.empty()) { // File doesn't exist or file is empty.
+            if (ReadFile.empty()) // File found but is empty
+            {
+                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (File found but empty)");
+
+                res.setStatus(HttpStatus::NotFound);
+                res.setHeader("Content-Type", "text/html");
+                res.send(PageEmpty);
+            }
+            else if (!fs::exists(filePath)) { // File doesn't exist
                 Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (404 Not Found)");
 
                 res.setStatus(HttpStatus::NotFound);
                 res.setHeader("Content-Type", "text/html");
                 res.send(Page404);
-            } 
+            }
             else { // The file exists.
                 Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (200 OK)");
 
                 res.setStatus(HttpStatus::OK);
                 res.setHeader("Content-Type", content_type);
                 res.send(ReadFile);
-            } });
+            }
+        });
 
     try
     {
