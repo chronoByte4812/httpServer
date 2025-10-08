@@ -12,8 +12,6 @@
 #include <fstream>
 #include <iostream>
 
-// "useFileLogging" to toggle weather to write to the logs file, saving space and memory.
-
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 std::string Page404 = "<h3 style='color: red;'>404 - File Not found</h3>";
@@ -99,14 +97,10 @@ static void handleConfig()
                 };
             };
 
-            if (useFileLogging == false)
-                Write_log("INFO", "Logging to file is off");
-
             if (!Page404Custom.empty())
             {
                 if (fs::exists(Page404Custom))
                 {
-                    Write_log("INFO", "Custom 404 page successfully loaded!");
                     Page404 = readFile(Page404Custom);
                 }
                 else
@@ -117,12 +111,15 @@ static void handleConfig()
             {
                 if (fs::exists(Page403Custom))
                 {
-                    Write_log("INFO", "Custom 403 page successfully loaded!");
                     Page403 = readFile(Page403Custom);
                 }
                 else
                     Write_log("WARNING", "The provided 403 page was not found");
             };
+
+            Write_log("INFO", std::format("Custom 404 page is {}", fs::exists(Page404Custom) ? "enabled" : "disabled"));
+            Write_log("INFO", std::format("Custom 403 page is {}", fs::exists(Page403Custom) ? "enabled" : "disabled"));
+            Write_log("INFO", std::format("Logging to file is {}", useFileLogging ? "enabled" : "disabled"));
         }
         catch (std::exception &error)
         {
@@ -171,11 +168,20 @@ int main(int argc, char *argv[])
         {
             char *arg = argv[i];
 
-            if (std::strcmp(arg, "--noconfig") == 0)
+            /*if (std::strcmp(arg, "--help") == 0)
+            {
+                std::cout << "--noconfig - Don't write a config file" << std::endl;
+                std::cout << "--nologfile - Don't write a log file" << std::endl;
+
+                return 0;
+            }
+            else if (std::strcmp(arg, "--noconfig") == 0)
                 useConfig = false;
 
-            if (std::strcmp(arg, "--nologfile") == 0)
+            else if (std::strcmp(arg, "--nologfile") == 0)
                 useFileLogging = false;
+            else
+                std::cout << "Invalid arg " << arg << std::endl;*/
         };
     };
 
@@ -234,6 +240,13 @@ int main(int argc, char *argv[])
                 res.setHeader("Content-Type", "text/html");
                 res.send(Page403);
             }
+            else if (!fs::exists(filePath)) { // File doesn't exist
+                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (404 Not Found)");
+
+                res.setStatus(HttpStatus::NotFound);
+                res.setHeader("Content-Type", "text/html");
+                res.send(Page404);
+            }
             else if (ReadFile.empty()) // File found but is empty
             {
                 Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (File found but empty)");
@@ -242,13 +255,6 @@ int main(int argc, char *argv[])
                 res.setHeader("Content-Type", "text/html");
                 res.send(PageEmpty);
             }
-            else if (!fs::exists(filePath)) { // File doesn't exist
-                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (404 Not Found)");
-
-                res.setStatus(HttpStatus::NotFound);
-                res.setHeader("Content-Type", "text/html");
-                res.send(Page404);
-            } 
             else { // The file exists.
                 Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (200 OK)");
 
