@@ -1,7 +1,11 @@
 ﻿// HttpServer-King.cpp : Defines the entry point for the application.
 // Wednesday, 26 August 2025, 11:13 PM
-// Edited on Saturday, 04 October 2025, 3:42 PM
+// Edited on Friday, 31 October 2025, 9:08 PM
+// Dimmed to be heavily refactored later
 //
+
+// #define DEBUG_MODE
+//  More #ifdef controls added later...
 
 #include "./HttpServerSrc-King/HttpServer.hpp"
 #include "./HttpServerSrc-King/util/HttpMethod.hpp"
@@ -23,7 +27,12 @@ std::vector<std::string> BlackListPaths;
 bool useConfig = true;
 bool useFileLogging = true;
 int Server_Port = 6432;
-HttpServer KingHttpServer;
+HttpServer httpServer_King;
+std::array version = {
+    1,
+    0,
+    0
+};
 
 static std::string readFile(const std::string &filePath)
 {
@@ -60,7 +69,7 @@ static void Write_log(const std::string &logType, const std::string &message)
     currentTime << std::put_time(&now_tm, "%d-%m-%y %H:%M:%S");
 
     std::string formattedLog = "[" + currentTime.str() + "] [" + logType + "] - " + message + "\n";
-    std::cout << validTypes.at(logType) << formattedLog << std::endl;
+    std::cout << validTypes.at(logType) << formattedLog << "\u001b[0m" << std::endl;
 
     if (useFileLogging == true)
         logFile << formattedLog;
@@ -100,9 +109,7 @@ static void handleConfig()
             if (!Page404Custom.empty())
             {
                 if (fs::exists(Page404Custom))
-                {
                     Page404 = readFile(Page404Custom);
-                }
                 else
                     Write_log("WARNING", "The provided 404 page was not found");
             };
@@ -110,20 +117,18 @@ static void handleConfig()
             if (!Page403Custom.empty())
             {
                 if (fs::exists(Page403Custom))
-                {
                     Page403 = readFile(Page403Custom);
-                }
                 else
                     Write_log("WARNING", "The provided 403 page was not found");
             };
 
             Write_log("INFO", std::format("Custom 404 page is {}", fs::exists(Page404Custom) ? "enabled" : "disabled"));
             Write_log("INFO", std::format("Custom 403 page is {}", fs::exists(Page403Custom) ? "enabled" : "disabled"));
-            Write_log("INFO", std::format("Logging to file is {}", useFileLogging ? "enabled" : "disabled"));
+            Write_log("INFO", std::format("Logging output to file is {}", useFileLogging ? "enabled" : "disabled"));
         }
-        catch (std::exception &error)
+        catch (json::parse_error error)
         {
-            Write_log("ERROR", "Failed to parse config data: " + std::string(error.what()));
+            Write_log("ERROR", std::format("Failed to parse config data: {}", error.what()));
         };
     }
     else
@@ -134,19 +139,19 @@ static void handleConfig()
         json configData = json::parse(R"(
 			{
                 "helpInfo": {
-                    "ip": "The IP is what the Server will bind to in order to listen.",
-                    "port": "The Port is what the Server will listen to in order to listen.",
-                    "BlackListPaths": "The BlackListPaths is a list of paths that the Server will block all Clients access to.",
-                    "MimeTypesCustom": "The MimeTypesCustom is a list of custom MimeTypes that the Server will use and overwrite default ones.",
-                    "Page403Custom": "The Page403Custom is a custom page that the Server will use when a Client tries to access a BlackListed path.",
-                    "useFileLogging": "Tells the server not to write any log files to the disk",
-                    "Page404Custom": "The Page404Custom is a custom page that the Server will use when a Client tries to access a file that does not exist."
+                    "BlackListPath": "An array that contains files and or paths that are forbidden to access",
+                    "MimeTypesCustom": "An array that contains custom defined file mime types",
+                    "useFileLogging": "A boolean to tell the server to write to a log file on the disk or not",
+                    "Page403Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash for the first path",
+                    "Page404Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash for the first path",
+                    "ip": "A string that tells the server where to bind, use 0.0.0.0 to bind to all interfaces",
+                    "port": "A number that tells the server what port to bind to, 80 is the standard for HTTP"
                 },
                 "BlackListPaths": [
                     "/ServerConfig.json",
                     "/ServerLogs.log"
             ],
-                "MimeTypesCustom": {},
+                "MimeTypesCustom": { },
                 "useFileLogging": true,
                 "Page403Custom": "",
                 "Page404Custom": "",
@@ -162,67 +167,55 @@ static void handleConfig()
 
 int main(int argc, char *argv[])
 {
+
+#ifdef DEBUG_MODE
+    Write_log("WARNING", "Debug mode is enabled");
+#endif
+
     if (argc > 1)
     {
         for (int i = 1; i < argc; i++)
         {
             char *arg = argv[i];
 
-            /*if (std::strcmp(arg, "--help") == 0)
+            if (std::strcmp(arg, "-help") == 0)
             {
-                std::cout << "--noconfig - Don't write a config file" << std::endl;
-                std::cout << "--nologfile - Don't write a log file" << std::endl;
+                Write_log("INFO", "=======Help=======");
+                Write_log("INFO", " -nc Flag that stops the server from using or creating a config file");
+                Write_log("INFO", " -nl Flag that stopsa the server from writing to a log file");
+                Write_log("INFO", "==================");
 
                 return 0;
-            }
-            else if (std::strcmp(arg, "--noconfig") == 0)
+            };
+
+            if (std::strcmp(arg, "-v") == 0)
+            {
+                Write_log("INFO", std::format("King HTTP Server Version: {}.{}.{}", version[0], version[1], version[2]));
+
+                return 0;
+            };
+
+            if (std::strcmp(arg, "--nc") == 0)
                 useConfig = false;
 
-            else if (std::strcmp(arg, "--nologfile") == 0)
+            if (std::strcmp(arg, "--nl") == 0)
                 useFileLogging = false;
-            else
-                std::cout << "Invalid arg " << arg << std::endl;*/
         };
     };
 
     if (useConfig == true)
         handleConfig();
 
-    KingHttpServer.use("/", HttpMethod::GET, [](HttpRequest req, HttpResponse &res, const NextFn &next)
-                       {
-        std::string clientIp = req.getRemoteAddr();
-        std::string path = req.getPath();
-        std::string filePath = fs::current_path().string() + "/index.html";
-        std::string ReadFile = readFile(filePath);
-        std::string content_type = MimeType::getMimeType(filePath);
-        std::string method = HttpMethod::toString(req.getMethod());
-
-        if (!fs::exists(filePath) || ReadFile.empty()) { // File doesn't exist or file is empty.
-
-            Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (404 Not Found)");
-
-            res.setStatus(HttpStatus::NotFound);
-            res.setHeader("Content-Type", "text/html");
-            res.send(Page404);
-        }
-        else { // The file exists.
-            Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (200 OK)");
-
-            res.setStatus(HttpStatus::OK);
-            res.setHeader("Content-Type", content_type);
-            res.send(ReadFile);
-        }
-    });
-
-    KingHttpServer.use(R"(/.*)", HttpMethod::GET, [](HttpRequest req, HttpResponse &res, const NextFn &next)
-                       {
+    httpServer_King.use(R"(/.*)", HttpMethod::GET, [](HttpRequest req, HttpResponse &res)
+                        {
             std::string clientIp = req.getRemoteAddr();
             std::string path = req.getPath();
             std::string filePath = path == "/" ? fs::current_path().string() + "/index.html" : fs::current_path().string() + path;
-            std::string ReadFile = readFile(filePath);
+            std::string file_contents = readFile(filePath);
             std::string content_type = MimeType::getMimeType(filePath);
             std::string method = HttpMethod::toString(req.getMethod());
             bool isBlackListed = false;
+            HttpStatus::Code statusCode = HttpStatus::Code::InternalServerError;
 
             for (const std::string& blacklistedPath : BlackListPaths)
             {
@@ -233,44 +226,53 @@ int main(int argc, char *argv[])
                 };
             };
 
-            if (isBlackListed) { // Private file.
-                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (403 Forbidden)");
-
-                res.setStatus(HttpStatus::Forbidden);
+			if (isBlackListed) { // File is blacklisted
+                res.setStatus(HttpStatus::Code::Forbidden);
                 res.setHeader("Content-Type", "text/html");
                 res.send(Page403);
-            }
-            else if (!fs::exists(filePath)) { // File doesn't exist
-                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (404 Not Found)");
 
-                res.setStatus(HttpStatus::NotFound);
+                statusCode = HttpStatus::Code::Forbidden;
+            }
+            else if (fs::exists(filePath)) // File is found
+            {
+                if (file_contents.empty()) // File is empty
+                {
+                    res.setStatus(HttpStatus::Code::NotFound);
+                    res.setHeader("Content-Type", "text/html");
+                    res.send(PageEmpty);
+
+                    statusCode = HttpStatus::Code::NotFound;
+                }
+                else // File is ok and ready
+                {
+                    res.setStatus(HttpStatus::Code::OK);
+                    res.setHeader("Content-Type", content_type);
+                    res.send(file_contents);
+
+                    statusCode = HttpStatus::Code::OK;
+                };
+            }
+            else // File is not found
+            {
+				res.setStatus(HttpStatus::Code::NotFound);
                 res.setHeader("Content-Type", "text/html");
                 res.send(Page404);
-            }
-            else if (ReadFile.empty()) // File found but is empty
-            {
-                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (File found but empty)");
+                
+				statusCode = HttpStatus::Code::NotFound;
+            };
 
-                res.setStatus(HttpStatus::NotFound);
-                res.setHeader("Content-Type", "text/html");
-                res.send(PageEmpty);
-            }
-            else { // The file exists.
-                Write_log("INFO", "Client " + clientIp + " " + method + " " + path + " (200 OK)");
-
-                res.setStatus(HttpStatus::OK);
-                res.setHeader("Content-Type", content_type);
-                res.send(ReadFile);
-            }
-        });
+            Write_log("INFO", std::format("Client {} {} {} {}", clientIp, method, path, HttpStatus::toString(statusCode))); 
+        }
+    );
 
     try
     {
-        Write_log("INFO", "Server listening on " + Server_IP + ":" + std::to_string(Server_Port) + (Server_IP == "0.0.0.0" ? " All network interfaces." : ""));
-        KingHttpServer.listen(Server_IP.c_str(), Server_Port);
+        Write_log("INFO", std::format("Server listening on http://{}:{}", Server_IP, Server_Port));
+
+        httpServer_King.listen(Server_IP.c_str(), Server_Port);
     }
-    catch (const std::exception &error)
+    catch (std::exception &error)
     {
-        std::cerr << "An error occured while running the server: " << error.what() << std::endl;
+        Write_log("ERROR", std::format("An error occured while running the server: {}", error.what()));
     };
 };
