@@ -235,11 +235,19 @@ int main(int argc, char *argv[])
             }
             else if (fs::exists(filePath)) // File is found
             {
-                if (file_contents.empty()) // File is empty
+                if (file_contents.empty() && !fs::is_directory(filePath)) // File is empty
                 {
                     res.setStatus(HttpStatus::Code::NotFound);
                     res.setHeader("Content-Type", "text/html");
                     res.send(PageEmpty);
+
+                    statusCode = HttpStatus::Code::NotFound;
+                }
+				else if (fs::exists(filePath) && fs::is_directory(filePath)) // File is a directory
+                {
+                    res.setStatus(HttpStatus::Code::NotFound);
+                    res.setHeader("Content-Type", "text/html");
+                    res.send(Page404);
 
                     statusCode = HttpStatus::Code::NotFound;
                 }
