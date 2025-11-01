@@ -142,8 +142,8 @@ static void handleConfig()
                     "BlackListPath": "An array that contains files and or paths that are forbidden to access",
                     "MimeTypesCustom": "An array that contains custom defined file mime types",
                     "useFileLogging": "A boolean to tell the server to write to a log file on the disk or not",
-                    "Page403Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash for the first path",
-                    "Page404Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash for the first path",
+                    "Page403Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash at char[0]",
+                    "Page404Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash char[0]",
                     "ip": "A string that tells the server where to bind, use 0.0.0.0 to bind to all interfaces",
                     "port": "A number that tells the server what port to bind to, 80 is the standard for HTTP"
                 },
@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
     if (useConfig == true)
         handleConfig();
 
-    httpServer_King.use(R"(/.*)", HttpMethod::GET, [](HttpRequest req, HttpResponse &res)
+    httpServer_King.use(R"(/.*)", HttpMethod::GET, [&](const HttpRequest &req, HttpResponse &res)
                         {
             std::string clientIp = req.getRemoteAddr();
             std::string path = req.getPath();
