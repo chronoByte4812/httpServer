@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
 				statusCode = HttpStatus::Code::NotFound;
             };
 
-            Write_log("INFO", std::format("Client {} {} {} {}", clientIp, method, path, HttpStatus::toString(statusCode))); 
+            Write_log("INFO", std::format("Client {} {} {} {}", clientIp, method, path, static_cast<int>(statusCode)));
         }
     );
 
