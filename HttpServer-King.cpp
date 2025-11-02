@@ -1,6 +1,6 @@
 ﻿// HttpServer-King.cpp : Defines the entry point for the application.
 // Wednesday, 26 August 2025, 11:13 PM
-// Edited on Friday, 31 October 2025, 9:08 PM
+// Edited on Sunday, 02 November 2025, 6:36 PMZ
 // Dimmed to be heavily refactored later
 //
 
@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <regex>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -26,8 +27,10 @@ std::string Server_Config_Path = (fs::current_path() / "ServerConfig.json").stri
 std::vector<std::string> BlackListPaths;
 bool useConfig = true;
 bool useFileLogging = true;
+bool hidePublicIp = false;
 int Server_Port = 6432;
 HttpServer httpServer_King;
+std::regex privateIpRegexp(R"(^(?:10\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]?[0-9])|192\.168\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]?[0-9])|172\.(?:1[6-9]|2[0-9]|3[0-1])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]?[0-9]))$)");
 std::array version = {
     1,
     0,
@@ -93,6 +96,7 @@ static void handleConfig()
             Server_Port = data.value("port", Server_Port);
             BlackListPaths = data.value("BlackListPaths", BlackListPaths);
             useFileLogging = data.value("useFileLogging", useFileLogging);
+            hidePublicIp = data.value("hidePublicIp", hidePublicIp);
 
             if (data.contains("MimeTypesCustom") && data["MimeTypesCustom"].is_object() && data["MimeTypesCustom"].size() > 0)
             {
@@ -125,6 +129,7 @@ static void handleConfig()
             Write_log("INFO", std::format("Custom 404 page is {}", fs::exists(Page404Custom) ? "enabled" : "disabled"));
             Write_log("INFO", std::format("Custom 403 page is {}", fs::exists(Page403Custom) ? "enabled" : "disabled"));
             Write_log("INFO", std::format("Logging output to file is {}", useFileLogging ? "enabled" : "disabled"));
+            Write_log("INFO", std::format("Redact public IP logging is {}", hidePublicIp ? "enabled" : "disabled"));
         }
         catch (json::parse_error error)
         {
@@ -143,9 +148,10 @@ static void handleConfig()
                     "MimeTypesCustom": "An array that contains custom defined file mime types",
                     "useFileLogging": "A boolean to tell the server to write to a log file on the disk or not",
                     "Page403Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash at char[0]",
-                    "Page404Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash char[0]",
+                    "Page404Custom": "A string path that tells the server to use a custom 403 page, avoid a forward slash at char[0]",
                     "ip": "A string that tells the server where to bind, use 0.0.0.0 to bind to all interfaces",
-                    "port": "A number that tells the server what port to bind to, 80 is the standard for HTTP"
+                    "port": "A number that tells the server what port to bind to, 80 is the standard for HTTP",
+                    "hidePublicIp": "Tells the server to hide the public IP addresses of clients for privacy reasons"
                 },
                 "BlackListPaths": [
                     "/ServerConfig.json",
@@ -153,6 +159,7 @@ static void handleConfig()
             ],
                 "MimeTypesCustom": { },
                 "useFileLogging": true,
+                "hidePublicIp": false,
                 "Page403Custom": "",
                 "Page404Custom": "",
                 "ip": "0.0.0.0",
@@ -169,7 +176,7 @@ int main(int argc, char *argv[])
 {
 
 #ifdef DEBUG_MODE
-    Write_log("WARNING", "Debug mode is enabled");
+    Write_log("DEBUG", "Debug mode is enabled");
 #endif
 
     if (argc > 1)
@@ -216,6 +223,9 @@ int main(int argc, char *argv[])
             std::string method = HttpMethod::toString(req.getMethod());
             bool isBlackListed = false;
             HttpStatus::Code statusCode = HttpStatus::Code::InternalServerError;
+
+            if (!std::regex_match(clientIp, privateIpRegexp) && hidePublicIp)
+                clientIp = "(IP hidden)";
 
             for (const std::string& blacklistedPath : BlackListPaths)
             {
