@@ -71,7 +71,7 @@ static void Write_log(const std::string &logType, const std::string &message)
     std::ostringstream currentTime;
     currentTime << std::put_time(&now_tm, "%d-%m-%y %H:%M:%S");
 
-    std::string formattedLog = "[" + currentTime.str() + "] [" + logType + "] - " + message + "\n";
+    std::string formattedLog = std::format("[{}] [{}] - {} \n", currentTime.str(), logType, message);
     std::cout << validTypes.at(logType) << formattedLog << "\u001b[0m" << std::endl;
 
     if (useFileLogging == true)
