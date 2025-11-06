@@ -50,7 +50,7 @@ static std::string readFile(const std::string &filePath)
     return contents.str();
 };
 
-static void Write_log(const std::string& logType, const std::string& message)
+static void Write_log(const std::string &logType, const std::string &message)
 {
     static const std::unordered_map<std::string, std::string> validTypes = {
         {"INFO", "\033[32m"},
