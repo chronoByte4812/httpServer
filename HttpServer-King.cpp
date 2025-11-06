@@ -1,6 +1,6 @@
 ﻿// HttpServer-King.cpp : Defines the entry point for the application.
 // Wednesday, 26 August 2025, 11:13 PM
-// Edited on Sunday, 02 November 2025, 6:36 PMZ
+// Edited on Friday, 07 November 2025, 11:34 AM
 // Dimmed to be heavily refactored later
 //
 
@@ -19,6 +19,7 @@
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+static std::mutex mutexLogging;
 std::string Page404 = "<h3 style='color: red;'>404 - File Not found</h3>";
 std::string PageEmpty = "<h3 style='color: red;'>404 - File was found but is empty</h3>";
 std::string Page403 = "<h3 style='color: red;'>403 - File Forbidden</h3>";
@@ -49,7 +50,7 @@ static std::string readFile(const std::string &filePath)
     return contents.str();
 };
 
-static void Write_log(const std::string &logType, const std::string &message)
+static void Write_log(const std::string& logType, const std::string& message)
 {
     static const std::unordered_map<std::string, std::string> validTypes = {
         {"INFO", "\033[32m"},
@@ -58,6 +59,7 @@ static void Write_log(const std::string &logType, const std::string &message)
         {"DEBUG", "\033[36m"}
     };
 
+    std::lock_guard<std::mutex> lock(mutexLogging);
     std::time_t now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::ofstream logFile("./ServerLogs.log", std::ios::app);
     std::tm now_tm;
@@ -70,12 +72,12 @@ static void Write_log(const std::string &logType, const std::string &message)
 
     std::ostringstream currentTime;
     currentTime << std::put_time(&now_tm, "%d-%m-%y %H:%M:%S");
+    std::string formattedLog = std::format("[{}] [{}] - {}", currentTime.str(), logType, message);
 
-    std::string formattedLog = std::format("[{}] [{}] - {} \n", currentTime.str(), logType, message);
-    std::cout << validTypes.at(logType) << formattedLog << "\u001b[0m" << std::endl;
+    std::cout << validTypes.at(logType) << formattedLog << "\u001b[0m\n" << std::endl;
 
     if (useFileLogging == true)
-        logFile << formattedLog;
+        logFile << formattedLog << "\n";
 
     logFile.close();
 };
