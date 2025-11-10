@@ -5,6 +5,7 @@
 #include <array>
 #include <vector>
 #include <span>
+#include <cstdint>
 
 namespace Base64 {
     constexpr char CHARACTERS[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
