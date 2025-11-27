@@ -11,7 +11,10 @@ if (POLICY CMP0141)
 endif()
 
 project ("HttpServer-King")
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+if (MSVC)
+    add_definitions(-DNOMINMAX)
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,10 +22,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Add source to this project's executable.
 add_executable(HttpServer-King "HttpServer-King.cpp" "json.h")
-
-if (MSVC)
-    add_definitions(-DNOMINMAX)
-endif()
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET HttpServer-King PROPERTY CXX_STANDARD 23)
