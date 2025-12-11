@@ -3,6 +3,7 @@
 ### Later...
  - Clean up comment
  - Add optional mount path to config (points to where exactly the server will serve content from)
+ - Refactor serving file logic
 
 ## Used libraries.
 
