@@ -11,6 +11,7 @@
 #include "HttpMethod.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
+#include "HttpServer.hpp"
 #include "HttpStatus.hpp"
 #include "MimeType.hpp"
 
@@ -22,7 +23,6 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <HttpServer.hpp>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
