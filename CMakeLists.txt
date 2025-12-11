@@ -2,7 +2,7 @@
 # project specific logic here.
 #
 
-cmake_minimum_required (VERSION 3.31)
+cmake_minimum_required (VERSION 3.16)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -21,7 +21,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Add source to this project's executable.
-add_executable(HttpServer-King "HttpServer-King.cpp" "json.h")
+add_executable(HttpServer-King "HttpServer-King.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET HttpServer-King PROPERTY CXX_STANDARD 23)

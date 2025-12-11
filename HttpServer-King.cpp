@@ -5,17 +5,33 @@
 //
 
 // #define DEBUG_MODE
-//  More #ifdef controls added later...
+// More #ifdef controls added later...
 
-#include "./HttpServerSrc-King/HttpServer.hpp"
-#include "./HttpServerSrc-King/util/HttpMethod.hpp"
-#include "./HttpServerSrc-King/util/MimeType.hpp"
 #include "./json.h"
+#include "HttpMethod.hpp"
+#include "HttpRequest.hpp"
+#include "HttpResponse.hpp"
+#include "HttpStatus.hpp"
+#include "MimeType.hpp"
+
+#include <array>
 #include <chrono>
+#include <corecrt.h>
+#include <ctime>
+#include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <HttpServer.hpp>
+#include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <regex>
+#include <sstream>
+#include <string>
+#include <string.h>
+#include <unordered_map>
+#include <vector>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -38,112 +54,116 @@ std::array version = {
     0
 };
 
-static std::string readFile(const std::string &filePath)
+class ServerUtils
 {
-    std::ostringstream contents;
-    std::ifstream file(filePath, std::ios::in | std::ios::binary);
+public:
+    static std::string readFile(const std::string &filePath)
+    {
+        std::ostringstream contents;
+        std::ifstream file(filePath, std::ios::in | std::ios::binary);
 
-    if (!file)
-        return "";
+        if (!file)
+            return "";
 
-    contents << file.rdbuf();
-    return contents.str();
-};
-
-static void Write_log(const std::string &logType, const std::string &message)
-{
-    static const std::unordered_map<std::string, std::string> validTypes = {
-        {"INFO", "\033[32m"},
-        {"WARNING", "\033[33m"},
-        {"ERROR", "\033[31m"},
-        {"DEBUG", "\033[36m"}
+        contents << file.rdbuf();
+        return contents.str();
     };
 
-    std::lock_guard<std::mutex> lock(mutexLogging);
-    std::time_t now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::ofstream logFile("./ServerLogs.log", std::ios::app);
-    std::tm now_tm;
+    static void Write_log(const std::string &logType, const std::string &message)
+    {
+        static const std::unordered_map<std::string, std::string> validTypes = {
+            {"INFO", "\033[32m"},
+            {"WARNING", "\033[33m"},
+            {"ERROR", "\033[31m"},
+            {"DEBUG", "\033[36m"}
+        };
+
+        std::lock_guard<std::mutex> lock(mutexLogging);
+        std::time_t now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::ofstream logFile("./ServerLogs.log", std::ios::app);
+        std::tm now_tm;
 
 #ifdef _WIN32
-    localtime_s(&now_tm, &now_time_t);
+        localtime_s(&now_tm, &now_time_t);
 #else
-    localtime_r(&now_time_t, &now_tm);
+        localtime_r(&now_time_t, &now_tm);
 #endif
 
-    std::ostringstream currentTime;
-    currentTime << std::put_time(&now_tm, "%d-%m-%y %H:%M:%S");
-    std::string formattedLog = std::format("[{}] [{}] - {}", currentTime.str(), logType, message);
+        std::ostringstream currentTime;
+        currentTime << std::put_time(&now_tm, "%d-%m-%y %H:%M:%S");
+        std::string formattedLog = std::format("[{}] [{}] - {}", currentTime.str(), logType, message);
 
-    std::cout << validTypes.at(logType) << formattedLog << "\u001b[0m\n" << std::endl;
+        std::cout << validTypes.at(logType) << formattedLog << "\u001b[0m\n"
+                  << std::endl;
 
-    if (useFileLogging == true)
-        logFile << formattedLog << "\n";
+        if (useFileLogging == true)
+            logFile << formattedLog << "\n";
 
-    logFile.close();
-};
+        logFile.close();
+    };
 
-static void handleConfig()
-{
-    if (fs::exists(Server_Config_Path) && readFile(Server_Config_Path).empty() == false)
+    static void handleConfig()
     {
-        try
+        if (fs::exists(Server_Config_Path) && readFile(Server_Config_Path).empty() == false)
         {
-            Write_log("INFO", "Config found!");
-
-            std::ifstream dataFile(Server_Config_Path);
-            json data = json::parse(dataFile);
-            std::string Page404Custom = data.value("Page404Custom", "");
-            std::string Page403Custom = data.value("Page403Custom", "");
-            Server_IP = data.value("ip", Server_IP);
-            Server_Port = data.value("port", Server_Port);
-            BlackListPaths = data.value("BlackListPaths", BlackListPaths);
-            useFileLogging = data.value("useFileLogging", useFileLogging);
-            hidePublicIp = data.value("hidePublicIp", hidePublicIp);
-
-            if (data.contains("MimeTypesCustom") && data["MimeTypesCustom"].is_object() && data["MimeTypesCustom"].size() > 0)
+            try
             {
-                Write_log("INFO", "Custom mime types loaded.");
+                Write_log("INFO", "Config found!");
 
-                MimeType::sMimeTypeMap.clear();
+                std::ifstream dataFile(Server_Config_Path);
+                json data = json::parse(dataFile);
+                std::string Page404Custom = data.value("Page404Custom", "");
+                std::string Page403Custom = data.value("Page403Custom", "");
+                Server_IP = data.value("ip", Server_IP);
+                Server_Port = data.value("port", Server_Port);
+                BlackListPaths = data.value("BlackListPaths", BlackListPaths);
+                useFileLogging = data.value("useFileLogging", useFileLogging);
+                hidePublicIp = data.value("hidePublicIp", hidePublicIp);
 
-                for (auto &[ext, type] : data["MimeTypesCustom"].items())
+                if (data.contains("MimeTypesCustom") && data["MimeTypesCustom"].is_object() && data["MimeTypesCustom"].size() > 0)
                 {
-                    MimeType::sMimeTypeMap[ext] = type;
+                    Write_log("INFO", "Custom mime types loaded.");
+
+                    MimeType::sMimeTypeMap.clear();
+
+                    for (auto &[ext, type] : data["MimeTypesCustom"].items())
+                    {
+                        MimeType::sMimeTypeMap[ext] = type;
+                    };
                 };
-            };
 
-            if (!Page404Custom.empty())
+                if (!Page404Custom.empty())
+                {
+                    if (fs::exists(Page404Custom))
+                        Page404 = readFile(Page404Custom);
+                    else
+                        Write_log("WARNING", "The provided 404 page was not found");
+                };
+
+                if (!Page403Custom.empty())
+                {
+                    if (fs::exists(Page403Custom))
+                        Page403 = readFile(Page403Custom);
+                    else
+                        Write_log("WARNING", "The provided 403 page was not found");
+                };
+
+                Write_log("INFO", std::format("Custom 404 page is {}", fs::exists(Page404Custom) ? "enabled" : "disabled"));
+                Write_log("INFO", std::format("Custom 403 page is {}", fs::exists(Page403Custom) ? "enabled" : "disabled"));
+                Write_log("INFO", std::format("Logging output to file is {}", useFileLogging ? "enabled" : "disabled"));
+                Write_log("INFO", std::format("Redact public IP logging is {}", hidePublicIp ? "enabled" : "disabled"));
+            }
+            catch (json::parse_error error)
             {
-                if (fs::exists(Page404Custom))
-                    Page404 = readFile(Page404Custom);
-                else
-                    Write_log("WARNING", "The provided 404 page was not found");
+                Write_log("ERROR", std::format("Failed to parse config data: {}", error.what()));
             };
-
-            if (!Page403Custom.empty())
-            {
-                if (fs::exists(Page403Custom))
-                    Page403 = readFile(Page403Custom);
-                else
-                    Write_log("WARNING", "The provided 403 page was not found");
-            };
-
-            Write_log("INFO", std::format("Custom 404 page is {}", fs::exists(Page404Custom) ? "enabled" : "disabled"));
-            Write_log("INFO", std::format("Custom 403 page is {}", fs::exists(Page403Custom) ? "enabled" : "disabled"));
-            Write_log("INFO", std::format("Logging output to file is {}", useFileLogging ? "enabled" : "disabled"));
-            Write_log("INFO", std::format("Redact public IP logging is {}", hidePublicIp ? "enabled" : "disabled"));
         }
-        catch (json::parse_error error)
+        else
         {
-            Write_log("ERROR", std::format("Failed to parse config data: {}", error.what()));
-        };
-    }
-    else
-    {
-        Write_log("INFO", "A server config data was not found. A new one has been written");
-        std::ofstream file("ServerConfig.json");
+            Write_log("INFO", "A server config data was not found. A new one has been written");
+            std::ofstream file("ServerConfig.json");
 
-        json configData = json::parse(R"(
+            json configData = json::parse(R"(
 			{
                 "helpInfo": {
                     "BlackListPath": "An array that contains files and or paths that are forbidden to access",
@@ -169,8 +189,9 @@ static void handleConfig()
             }
 		)");
 
-        file << configData.dump(4);
-        file.close();
+            file << configData.dump(4);
+            file.close();
+        };
     };
 };
 
@@ -189,17 +210,17 @@ int main(int argc, char *argv[])
 
             if (std::strcmp(arg, "-help") == 0)
             {
-                Write_log("INFO", "=======Help=======");
-                Write_log("INFO", " -nc Flag that stops the server from using or creating a config file");
-                Write_log("INFO", " -nl Flag that stopsa the server from writing to a log file");
-                Write_log("INFO", "==================");
+                ServerUtils::Write_log("INFO", "=======Help=======");
+                ServerUtils::Write_log("INFO", " -nc Flag that stops the server from using or creating a config file");
+                ServerUtils::Write_log("INFO", " -nl Flag that stopsa the server from writing to a log file");
+                ServerUtils::Write_log("INFO", "==================");
 
                 return 0;
             };
 
             if (std::strcmp(arg, "-v") == 0)
             {
-                Write_log("INFO", std::format("King HTTP Server Version: {}.{}.{}", version[0], version[1], version[2]));
+                ServerUtils::Write_log("INFO", std::format("King HTTP Server Version: {}.{}.{}", version[0], version[1], version[2]));
 
                 return 0;
             };
@@ -213,14 +234,14 @@ int main(int argc, char *argv[])
     };
 
     if (useConfig == true)
-        handleConfig();
+        ServerUtils::handleConfig();
 
     httpServer_King.use(R"(/.*)", HttpMethod::GET, [&](const HttpRequest &req, HttpResponse &res)
                         {
             std::string clientIp = req.getRemoteAddr();
             std::string path = req.getPath();
             std::string filePath = path == "/" ? fs::current_path().string() + "/index.html" : fs::current_path().string() + path;
-            std::string file_contents = readFile(filePath);
+            std::string file_contents = ServerUtils::readFile(filePath);
             std::string content_type = MimeType::getMimeType(filePath);
             std::string method = HttpMethod::toString(req.getMethod());
             bool isBlackListed = false;
@@ -281,18 +302,16 @@ int main(int argc, char *argv[])
 				statusCode = HttpStatus::Code::NotFound;
             };
 
-            Write_log("INFO", std::format("Client {} {} {} {}", clientIp, method, path, static_cast<int>(statusCode)));
-        }
-    );
+            ServerUtils::Write_log("INFO", std::format("Client {} {} {} {}", clientIp, method, path, static_cast<int>(statusCode))); });
 
     try
     {
-        Write_log("INFO", std::format("Server listening on http://{}:{}", Server_IP, Server_Port));
+        ServerUtils::ServerUtils::Write_log("INFO", std::format("Server listening on http://{}:{}", Server_IP, Server_Port));
 
         httpServer_King.listen(Server_IP.c_str(), Server_Port);
     }
     catch (std::exception &error)
     {
-        Write_log("ERROR", std::format("An error occured while running the server: {}", error.what()));
+        ServerUtils::Write_log("ERROR", std::format("An error occured while running the server: {}", error.what()));
     };
 };
