@@ -7,17 +7,15 @@
 // #define DEBUG_MODE
 // More #ifdef controls added later...
 
-#include "./json.h"
 #include "HttpMethod.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "HttpServer.hpp"
 #include "HttpStatus.hpp"
+#include "json.h"
 #include "MimeType.hpp"
 
-#include <array>
 #include <chrono>
-#include <corecrt.h>
 #include <ctime>
 #include <exception>
 #include <filesystem>
@@ -26,12 +24,8 @@
 #include <iomanip>
 #include <iostream>
 #include <mutex>
-#include <regex>
 #include <sstream>
 #include <string>
-#include <string.h>
-#include <unordered_map>
-#include <vector>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;

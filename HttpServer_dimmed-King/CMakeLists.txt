@@ -1,4 +1,4 @@
-﻿add_executable(HttpServer_dimmed-King "HttpServer_dimmed-King.cpp" "../json.h")
+﻿add_executable(HttpServer_dimmed-King "HttpServer_dimmed-King.cpp" "json.h")
 
 if (MSVC)
     add_definitions(-DNOMINMAX)
